@@ -49,9 +49,9 @@ class AAvolutionizer:
     # __________________________________________________________________________________________________________________
     POPULATION_SIZE = 200
     # these all per 100 AA or entries
-    N_CROSSOVER_SEGS = 100
-    N_CROSSOVER = 100  # probability for crossover
-    N_POINT_MUTATION = 100  # probability for mutating an individual
+    N_CROSSOVER_SEGS = 50
+    N_CROSSOVER = 5  # probability for crossover
+    N_POINT_MUTATION = 5  # probability for mutating an individual
     N_INDELS = 20
     MAX_GENERATIONS = 500
     MAX_TMD_LEN = 30
@@ -66,7 +66,7 @@ class AAvolutionizer:
                        n_indels: (int, float) = None,
                        max_gen: (int, float) = None,
                        max_len_tmd: (int, float) = None,
-                       min_len_tmd: (int, float) = None,):
+                       min_len_tmd: (int, float) = None, ):
         # population
         if isinstance(set_population_size, int) and set_population_size > 0:
             cls.POPULATION_SIZE = set_population_size
@@ -99,14 +99,32 @@ class AAvolutionizer:
                 average mutagenic events for the population 
                 (input values are per 100 individuals)
                 ___________________________________________
-                frequency crossover of segments: {(cls.N_CROSSOVER_SEGS*cls.POPULATION_SIZE)/100} / {cls.POPULATION_SIZE}
-                frequency crossover within each segment: {(cls.N_CROSSOVER*cls.POPULATION_SIZE)/100} / {cls.POPULATION_SIZE}
-                frequency point mutations: {(cls.N_POINT_MUTATION*cls.POPULATION_SIZE)/100} / {cls.POPULATION_SIZE}
-                frequency indels: {(cls.N_INDELS*cls.POPULATION_SIZE)/100} / {cls.POPULATION_SIZE}
+                frequency crossover of segments: {(cls.N_CROSSOVER_SEGS * cls.POPULATION_SIZE) / 100} / {cls.POPULATION_SIZE}
+                frequency crossover within each segment: {cls.N_CROSSOVER} / 100 amino acids
+                frequency point mutations: {cls.N_POINT_MUTATION} / 100 amino acids
+                frequency indels: {(cls.N_INDELS * cls.POPULATION_SIZE) / 100} / {cls.POPULATION_SIZE} (TMD only)
                 """)
 
     # INITIALIZING
     # __________________________________________________________________________________________________________________
+    # connect mode with correct table entries: aa_propensity, length_dist
+    dict_mode = {"rand_prop": {"jmd_n": "codon_table",
+                               "tmd": "codon_table",
+                               "jmd_c": "codon_table"},
+                 "prop_N_out": {"jmd_n": "N_out_JMD_N",
+                                "tmd": "N_out_TMD",
+                                "jmd_c": "N_out_JMD_C"},
+                 "prop_SUB": {"jmd_n": "SUB_JMD_N",
+                              "tmd": "SUB_TMD",
+                              "jmd_c": "SUB_JMD_C"}}
+
+
+    def __init__(self, mode, set_part_slices, seq_parts_list):
+        self.mode = mode
+        self.set_part_slices = set_part_slices
+        self.seq_parts_list = seq_parts_list
+
+
     @classmethod
     def gen_zero_maker(cls, mode: str = "rand_prop", **parts_kwargs):
 
@@ -137,37 +155,26 @@ class AAvolutionizer:
             raise ValueError(f"parts list ({len(set_part_slices)}) and parts length list "
                              f"({len(set_len_part_slices)}) are not of same length!")
 
-        # connect mode with correct table entries: aa_propensity, length_dist
-        dict_mode = {"rand_prop": {"jmd_n": "codon_table",
-                                   "tmd": "codon_table",
-                                   "jmd_c": "codon_table"},
-                     "prop_N_out": {"jmd_n": "N_out_JMD_N",
-                                    "tmd": "N_out_TMD",
-                                    "jmd_c": "N_out_JMD_C"},
-                     "prop_SUB": {"jmd_n": "SUB_JMD_N",
-                                  "tmd": "SUB_TMD",
-                                  "jmd_c": "SUB_JMD_C"}}
-
-        if mode not in dict_mode.keys():
+        if mode not in cls.dict_mode.keys():
             mode = "rand_prop"
         seq_parts_list = []
         for part_seq, len_part in zip(set_part_slices, set_len_part_slices):
 
-            raw_aa = cls.aa_propensities_df[dict_mode[mode][part_seq]]
+            raw_aa = cls.aa_propensities_df[cls.dict_mode[mode][part_seq]]
             # properties of length
             if mode == "prop_N_out":
                 if len_part < 1:
-                    length_aa_series = cls.length_dist_df[dict_mode[mode][part_seq]].dropna()
+                    length_aa_series = cls.length_dist_df[cls.dict_mode[mode][part_seq]].dropna()
                     pre_p = length_aa_series.to_numpy().tolist()
-                    norm_p = [p/sum(pre_p) for p in pre_p]
+                    norm_p = [p / sum(pre_p) for p in pre_p]
                     length_aa = np.random.choice(length_aa_series.index.tolist(), 1, p=norm_p)
                 else:
                     length_aa = len_part
             elif mode == "prop_SUB":
                 if len_part < 1:
-                    length_aa_series = cls.length_dist_df[dict_mode[mode][part_seq]].dropna()
+                    length_aa_series = cls.length_dist_df[cls.dict_mode[mode][part_seq]].dropna()
                     pre_p = length_aa_series.to_numpy().tolist()
-                    norm_p = [p/sum(pre_p) for p in pre_p]
+                    norm_p = [p / sum(pre_p) for p in pre_p]
                     length_aa = np.random.choice(length_aa_series.index.tolist(), 1, p=norm_p)
                 else:
                     length_aa = len_part
@@ -190,7 +197,42 @@ class AAvolutionizer:
                 list_seq.extend(get_weighted_aa)
             seq = "".join(list_seq)
             seq_parts_list.append(seq)
-        return seq_parts_list
+            AAvolutionizer._get_parts(mode, set_part_slices)
+        return cls(mode, set_part_slices, seq_parts_list)
+
+
+    def show_parts(self):
+        return self.seq_parts_list
+
+
+    slices_propensity_data = None
+
+    @classmethod
+    def _get_parts(cls, mode, set_part_slices):
+        list_propensity_data = []
+        for part_seq in set_part_slices:
+            path_script, path_module, sep = stdc.find_folderpath()
+            path_data_sheets = f"{path_module.split('aavolution')[0]}_data{sep}"
+            aa_propensities_df = pd.read_excel(f"{path_data_sheets}aa_propensities.xlsx").set_index("AA")
+
+            aa_list = aa_propensities_df[AAvolutionizer.dict_mode[mode][part_seq]].dropna()
+            pre_p = aa_list.to_numpy().tolist()
+            norm = [p / sum(pre_p) for p in pre_p]
+            list_aa_letters = aa_list.index.tolist()
+            list_propensity_data.append([list_aa_letters, norm])
+        cls.slices_propensity_data = list_propensity_data
+
+    # MUTAGENESIS
+    # __________________________________________________________________________________________________________________
+
+
+
+
+
+
+
+
+
 
 
     # PREDICTION
@@ -227,9 +269,8 @@ class AAvolutionizer:
 
 @timingmethod
 def main_evo():
-
     toolbox = base.Toolbox()
-    toolbox.register("gen_zero_maker", AAvolutionizer.gen_zero_maker, "prop_SUB")
+    toolbox.register("gen_zero_maker", AAvolutionizer.gen_zero_maker("prop_SUB").show_parts)
     pool_gen_0 = tools.initRepeat(list, toolbox.gen_zero_maker, 30)
     print(pool_gen_0)
     split_pool = seq_splitter(pool_gen_0)
@@ -237,6 +278,8 @@ def main_evo():
     agg_pool = seq_agglomerater(split_pool, ["jmd_n", "tmd", "jmd_c"])
     print(agg_pool)
     AAvolutionizer.set_mut_params()
+    print(AAvolutionizer.slices_propensity_data)
+
 
 # for debugging
 # ______________________________________________________________________________________________________________________
