@@ -3,6 +3,8 @@ import pandas as pd
 from StandardConfig import timingmethod
 import StandardConfig as stdc
 import numpy as np
+import random
+import math
 # ML tools import
 from deap import base
 from deap import creator
@@ -14,7 +16,15 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-def seq_splitter(list_parts):
+def proba_decision(float_proba):
+    decimal, int_proba = math.modf(float_proba)
+    if random.random() < decimal:  # decides if this instance chance occurs or not
+        int_proba += 1
+    return int(int_proba)
+
+
+def seq_splitter(df_parts, part_tags: list):
+    list_parts = df_parts[part_tags].to_numpy().tolist()
     splitted_entry_list = []
     for entries in list_parts:
         list_splitted_parts = [list(parts) for parts in entries]
@@ -119,10 +129,10 @@ class AAvolutionizer:
                               "jmd_c": "SUB_JMD_C"}}
 
 
-    def __init__(self, mode, set_part_slices, seq_parts_list):
+    def __init__(self, mode, set_part_slices, df_seq_parts):
         self.mode = mode
         self.set_part_slices = set_part_slices
-        self.seq_parts_list = seq_parts_list
+        self.df_seq_parts = df_seq_parts
 
 
     @classmethod
@@ -157,54 +167,62 @@ class AAvolutionizer:
 
         if mode not in cls.dict_mode.keys():
             mode = "rand_prop"
-        seq_parts_list = []
-        for part_seq, len_part in zip(set_part_slices, set_len_part_slices):
 
-            raw_aa = cls.aa_propensities_df[cls.dict_mode[mode][part_seq]]
-            # properties of length
-            if mode == "prop_N_out":
-                if len_part < 1:
-                    length_aa_series = cls.length_dist_df[cls.dict_mode[mode][part_seq]].dropna()
-                    pre_p = length_aa_series.to_numpy().tolist()
-                    norm_p = [p / sum(pre_p) for p in pre_p]
-                    length_aa = np.random.choice(length_aa_series.index.tolist(), 1, p=norm_p)
+        # generate the population
+        n = 0
+        list_seq_all_parts = []
+        while n < cls.POPULATION_SIZE:
+            seq_parts_list = []
+            for part_seq, len_part in zip(set_part_slices, set_len_part_slices):
+
+                raw_aa = cls.aa_propensities_df[cls.dict_mode[mode][part_seq]]
+                # properties of length
+                if mode == "prop_N_out":
+                    if len_part < 1:
+                        length_aa_series = cls.length_dist_df[cls.dict_mode[mode][part_seq]].dropna()
+                        pre_p = length_aa_series.to_numpy().tolist()
+                        norm_p = [p / sum(pre_p) for p in pre_p]
+                        length_aa = np.random.choice(length_aa_series.index.tolist(), 1, p=norm_p)
+                    else:
+                        length_aa = len_part
+                elif mode == "prop_SUB":
+                    if len_part < 1:
+                        length_aa_series = cls.length_dist_df[cls.dict_mode[mode][part_seq]].dropna()
+                        pre_p = length_aa_series.to_numpy().tolist()
+                        norm_p = [p / sum(pre_p) for p in pre_p]
+                        length_aa = np.random.choice(length_aa_series.index.tolist(), 1, p=norm_p)
+                    else:
+                        length_aa = len_part
                 else:
-                    length_aa = len_part
-            elif mode == "prop_SUB":
-                if len_part < 1:
-                    length_aa_series = cls.length_dist_df[cls.dict_mode[mode][part_seq]].dropna()
-                    pre_p = length_aa_series.to_numpy().tolist()
-                    norm_p = [p / sum(pre_p) for p in pre_p]
-                    length_aa = np.random.choice(length_aa_series.index.tolist(), 1, p=norm_p)
-                else:
-                    length_aa = len_part
-            else:
-                if len_part < 1:
-                    length_aa = np.random.randint(15, 35)  # based on TMHMM arbitrary rules
-                else:
-                    length_aa = len_part
+                    if len_part < 1:
+                        length_aa = np.random.randint(15, 35)  # based on TMHMM arbitrary rules
+                    else:
+                        length_aa = len_part
 
-            list_aa_letters = cls.aa_propensities_df.index.tolist()
+                list_aa_letters = cls.aa_propensities_df.index.tolist()
 
-            # takes list of raw input variables
-            norm = [float(i) / sum(raw_aa) for i in raw_aa]
+                # takes list of raw input variables
+                norm = [float(i) / sum(raw_aa) for i in raw_aa]
 
-            # random sequence generation (gen 0)
-            seq = ""
-            list_seq = []
-            for i in range(int(length_aa)):
-                get_weighted_aa = np.random.choice(list_aa_letters, 1, p=norm)
-                list_seq.extend(get_weighted_aa)
-            seq = "".join(list_seq)
-            seq_parts_list.append(seq)
-            AAvolutionizer._get_parts(mode, set_part_slices)
-        return cls(mode, set_part_slices, seq_parts_list)
+                # random sequence generation (gen 0)
+                seq = ""
+                list_seq = []
+                for i in range(int(length_aa)):
+                    get_weighted_aa = np.random.choice(list_aa_letters, 1, p=norm)
+                    list_seq.extend(get_weighted_aa)
+                seq = "".join(list_seq)
+                seq_parts_list.append(seq)
+            list_seq_all_parts.append(seq_parts_list)
+            n += 1
+        df_seq_parts = pd.DataFrame(list_seq_all_parts, columns=set_part_slices)
+        AAvolutionizer._get_parts(mode, set_part_slices)
+        return cls(mode, set_part_slices, df_seq_parts)
 
 
-    def show_parts(self):
-        return self.seq_parts_list
+    def return_parts(self):
+        return self.df_seq_parts
 
-
+    # save the correct amino acid propensity scales for the mutations
     slices_propensity_data = None
 
     @classmethod
@@ -224,8 +242,8 @@ class AAvolutionizer:
 
     # MUTAGENESIS
     # __________________________________________________________________________________________________________________
-
-
+    def single_point_mutation(self, split_aa_list):
+        mut_proba = (AAvolutionizer.N_POINT_MUTATION / 100)  # proba per 100 AA
 
 
 
@@ -239,11 +257,12 @@ class AAvolutionizer:
     # __________________________________________________________________________________________________________________
     @staticmethod
     @timingmethod
-    def aa_tree_pred(offspring_test_df: pd.DataFrame, sf_split: list):
+    def aa_tree_pred(non_sub_ccp_feat: pd.DataFrame,
+                     non_sub_df: pd.DataFrame,
+                     offspring_test_df: pd.DataFrame,
+                     sf_split: list):
 
-        # imports for prediction
-        non_sub_ccp_feat = pd.read_excel("")
-        non_sub_df = pd.read_excel("")
+        #  get labels
         non_sub_labels = non_sub_df["labels"]
 
         # Create feature matrix
@@ -270,10 +289,9 @@ class AAvolutionizer:
 @timingmethod
 def main_evo():
     toolbox = base.Toolbox()
-    toolbox.register("gen_zero_maker", AAvolutionizer.gen_zero_maker("prop_SUB").show_parts)
-    pool_gen_0 = tools.initRepeat(list, toolbox.gen_zero_maker, 30)
+    pool_gen_0 = AAvolutionizer.gen_zero_maker("prop_SUB").return_parts()
     print(pool_gen_0)
-    split_pool = seq_splitter(pool_gen_0)
+    split_pool = seq_splitter(pool_gen_0, ["jmd_n", "tmd", "jmd_c"])
     print(split_pool)
     agg_pool = seq_agglomerater(split_pool, ["jmd_n", "tmd", "jmd_c"])
     print(agg_pool)
