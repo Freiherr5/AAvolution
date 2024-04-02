@@ -59,7 +59,6 @@ class AAvolutionizer:
     # __________________________________________________________________________________________________________________
     POPULATION_SIZE = 200
     # these all per 100 AA or entries
-    N_CROSSOVER_SEGS = 50
     N_CROSSOVER = 5  # probability for crossover
     N_POINT_MUTATION = 5  # probability for mutating an individual
     N_INDELS = 20
@@ -71,7 +70,6 @@ class AAvolutionizer:
     def set_mut_params(cls,
                        set_population_size: int = None,
                        n_crossover_per_seg: (int, float) = None,
-                       n_crossover_segs: (int, float) = None,
                        n_point_mut: (int, float) = None,
                        n_indels: (int, float) = None,
                        max_gen: (int, float) = None,
@@ -83,8 +81,6 @@ class AAvolutionizer:
         # mutation
         if isinstance(n_crossover_per_seg, (int, float)) and n_crossover_per_seg >= 0:
             cls.N_CROSSOVER_SEGS = n_crossover_per_seg
-        if isinstance(n_crossover_segs, (int, float)) and n_crossover_segs >= 0:
-            cls.N_CROSSOVER = n_crossover_segs
         if isinstance(n_point_mut, (int, float)) and n_point_mut >= 0:
             cls.N_POINT_MUTATION = n_point_mut
         if isinstance(n_indels, (int, float)) and n_indels >= 0:
@@ -118,6 +114,7 @@ class AAvolutionizer:
     # INITIALIZING
     # __________________________________________________________________________________________________________________
     # connect mode with correct table entries: aa_propensity, length_dist
+    # side note: prop means propensity
     dict_mode = {"rand_prop": {"jmd_n": "codon_table",
                                "tmd": "codon_table",
                                "jmd_c": "codon_table"},
@@ -257,8 +254,9 @@ class AAvolutionizer:
                     ind_allel = entry.index(allels)
                     list_aa_letters = AAvolutionizer.slices_propensity_data[ind_allel][0]
                     norm = AAvolutionizer.slices_propensity_data[ind_allel][1]
-                    get_weighted_aa = np.random.choice(list_aa_letters, 1, p=norm)
+                    get_weighted_aa = np.random.choice(list_aa_letters, 1, p=norm)[0]
                     allels[pos] = get_weighted_aa
+                    i += 1
                 list_allels_entry.append(allels)
             split_aa_list_mut.append(list_allels_entry)
         return split_aa_list_mut
@@ -308,7 +306,7 @@ def main_evo():
     print(agg_pool)
     AAvolutionizer.set_mut_params()
     print(AAvolutionizer.slices_propensity_data)
-
+    print(AAvolutionizer.single_point_mutation(split_pool))
 
 # for debugging
 # ______________________________________________________________________________________________________________________
