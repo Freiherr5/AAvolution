@@ -223,6 +223,7 @@ class AAvolutionizer:
         return self.df_seq_parts
 
     # save the correct amino acid propensity scales for the mutations
+    # __________________________________________________________________________________________________________________
     slices_propensity_data = None
 
     @classmethod
@@ -242,15 +243,25 @@ class AAvolutionizer:
 
     # MUTAGENESIS
     # __________________________________________________________________________________________________________________
-    def single_point_mutation(self, split_aa_list):
+    @staticmethod
+    def single_point_mutation(split_aa_list):
         mut_proba = (AAvolutionizer.N_POINT_MUTATION / 100)  # proba per 100 AA
-
-
-
-
-
-
-
+        split_aa_list_mut = []
+        for entry in split_aa_list:
+            list_allels_entry = []
+            for allels in entry:
+                mut_proba_allel = proba_decision(mut_proba * len(allels))
+                i = 0
+                while i < mut_proba_allel:
+                    pos = random.randint(0, len(allels)-1)
+                    ind_allel = entry.index(allels)
+                    list_aa_letters = AAvolutionizer.slices_propensity_data[ind_allel][0]
+                    norm = AAvolutionizer.slices_propensity_data[ind_allel][1]
+                    get_weighted_aa = np.random.choice(list_aa_letters, 1, p=norm)
+                    allels[pos] = get_weighted_aa
+                list_allels_entry.append(allels)
+            split_aa_list_mut.append(list_allels_entry)
+        return split_aa_list_mut
 
 
     # PREDICTION
