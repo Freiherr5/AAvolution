@@ -59,8 +59,8 @@ class AAvolutionizer:
     # __________________________________________________________________________________________________________________
     POPULATION_SIZE = 200
     # these all per 100 AA or entries
-    N_CROSSOVER = 5  # probability for crossover
-    N_POINT_MUTATION = 5  # probability for mutating an individual
+    N_CROSSOVER = 1000
+    N_POINT_MUTATION = 5
     N_INDELS = 20
     MAX_GENERATIONS = 500
     MAX_TMD_LEN = 30
@@ -105,10 +105,9 @@ class AAvolutionizer:
                 average mutagenic events for the population 
                 (input values are per 100 individuals)
                 ___________________________________________
-                frequency crossover of segments: {(cls.N_CROSSOVER_SEGS * cls.POPULATION_SIZE) / 100} / {cls.POPULATION_SIZE}
-                frequency crossover within each segment: {cls.N_CROSSOVER} / 100 amino acids
+                frequency crossover within each segment: {(cls.N_CROSSOVER * cls.POPULATION_SIZE) / 100} / {cls.POPULATION_SIZE}
                 frequency point mutations: {cls.N_POINT_MUTATION} / 100 amino acids
-                frequency indels: {(cls.N_INDELS * cls.POPULATION_SIZE) / 100} / {cls.POPULATION_SIZE} (TMD only)
+                frequency indels: {cls.N_INDELS} / 100 amino acids (TMD only)
                 """)
 
     # INITIALIZING
@@ -261,6 +260,42 @@ class AAvolutionizer:
             split_aa_list_mut.append(list_allels_entry)
         return split_aa_list_mut
 
+    @staticmethod
+    def crossover_allel(split_aa_list):
+        # for crossovers to work, split_aa_list must be changed while being iterrated
+        counter = 0   # index current
+        cross_proba = ((AAvolutionizer.N_CROSSOVER * AAvolutionizer.POPULATION_SIZE) / (100 * len(split_aa_list[0])))
+        for entry in split_aa_list:
+            for allels in entry:
+                if random.random() < cross_proba:
+                    # current entry
+                    pos_start = random.randint(0, len(allels)-1)
+                    pos_stop = random.randint(pos_start, len(allels))
+                    seq_current = allels[pos_start:pos_stop]
+                    ind_allel = entry.index(allels)           # index for both! allel index!
+
+                    # get mating mate
+                    while True:
+                        index_random_mate = random.randint(0, len(split_aa_list)-1)
+                        get_random_mate = split_aa_list[index_random_mate]
+                        if get_random_mate != entry:
+                            break
+                    allel_random_mate = get_random_mate[ind_allel]
+                    if len(allel_random_mate) > len(seq_current):
+                        pos_start_rando = random.randint(0, len(allel_random_mate) - (1+len(seq_current)))
+                        pos_stop_rando = pos_start_rando + len(seq_current)
+                        seq_random_mate = allel_random_mate[pos_start_rando:pos_stop_rando]
+                        # the CROSSOVER
+                        allels[pos_start:pos_stop] = seq_random_mate
+                        allel_random_mate[pos_start_rando:pos_stop_rando] = seq_current
+
+                        # applying the crossover to the current split_aa_list, change in place while iterrating
+                        split_aa_list[counter][ind_allel] = allels
+                        split_aa_list[index_random_mate][ind_allel] = allel_random_mate
+            counter += 1
+        return split_aa_list
+
+
 
     # PREDICTION
     # __________________________________________________________________________________________________________________
@@ -297,17 +332,19 @@ class AAvolutionizer:
 
 @timingmethod
 def main_evo():
-    toolbox = base.Toolbox()
+    import copy
     pool_gen_0 = AAvolutionizer.gen_zero_maker("prop_SUB").return_parts()
     print(pool_gen_0)
     split_pool = seq_splitter(pool_gen_0, ["jmd_n", "tmd", "jmd_c"])
     print(split_pool)
-    agg_pool = seq_agglomerater(split_pool, ["jmd_n", "tmd", "jmd_c"])
-    print(agg_pool)
-    AAvolutionizer.set_mut_params()
-    print(AAvolutionizer.slices_propensity_data)
-    print(AAvolutionizer.single_point_mutation(split_pool))
-
+    split_pool_for_mut = copy.deepcopy(split_pool)
+    mut_pool = AAvolutionizer.single_point_mutation(split_pool_for_mut)
+    print(mut_pool)
+    new_mut_list = copy.deepcopy(mut_pool)
+    cross_pool = AAvolutionizer.crossover_allel(new_mut_list)
+    print(cross_pool)
+    print(split_pool == mut_pool)
+    print(mut_pool == cross_pool)
 # for debugging
 # ______________________________________________________________________________________________________________________
 if __name__ == "__main__":
