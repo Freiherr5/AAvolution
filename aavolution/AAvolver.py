@@ -43,6 +43,20 @@ def seq_agglomerater(list_parts, part_tags: list):
     df = pd.DataFrame(list_entries_agglomerated, columns=part_tags)
     return df
 
+def evolution_display(list_pred_dfs):
+    maxFitnessValues = []                         # WIP
+    meanFitnessValues = []
+    # for loop to unpack list of dataframes with results
+
+    # add threshold lines of substrate performance
+    sns.set_style("whitegrid")
+    plt.plot(maxFitnessValues, color='#BF2C34', label="max fitness")
+    plt.plot(meanFitnessValues, color='#43ASBE', label="mean fitness")
+    plt.xlabel('Generation')
+    plt.ylabel('Max / Average Fitness')
+    plt.title('Max and Average Fitness over Generations')
+    plt.legend()
+    plt.show()
 
 class AAvolutionizer:
     # script and module path! + seperator depending on operating system
@@ -344,6 +358,7 @@ class AAvolutionizer:
                         df_aa_split = df_aa_split.drop(index, axis=0)
         return df_aa_split
 
+
     @staticmethod
     def aa_tree_pred(non_sub_ccp_feat: pd.DataFrame,
                      non_sub_df: pd.DataFrame,
@@ -373,6 +388,27 @@ class AAvolutionizer:
 
         return offspring_test_df
 
+    def mate_survivors(self, split_aa_df):
+        current_survivor_count = split_aa_df.shape[0]
+        target_population = AAvolutionizer.POPULATION_SIZE
+
+        allels_tags = self.set_part_slices
+
+        list_parts_sorted = []
+        for tag in allels_tags:
+            allel_list = split_aa_df[tag].to_numpy().tolist()
+            list_parts_sorted.append(allel_list)
+
+        surviver_list = split_aa_df[allels_tags].to_numpy().tolist()
+        count = 0
+        while count < (target_population-current_survivor_count):
+            child = []
+            for allel_genes in list_parts_sorted:
+                allel_gene = random.choice(allel_genes)
+                child.append(allel_gene)
+            surviver_list.append(child)
+            count += 1
+        return surviver_list
 
 @timingmethod
 def main_evo():
@@ -397,6 +433,9 @@ def main_evo():
     print(agg_pool)
     tmd_filter = initialize.tmd_length_filter(agg_pool)
     print(tmd_filter)
+    new_gen = initialize.mate_survivors(tmd_filter)
+    print(len(new_gen))
+    print(new_gen)
 # for debugging
 # ______________________________________________________________________________________________________________________
 if __name__ == "__main__":
