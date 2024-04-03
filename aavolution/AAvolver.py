@@ -59,12 +59,12 @@ class AAvolutionizer:
     # __________________________________________________________________________________________________________________
     POPULATION_SIZE = 200
     # these all per 100 AA or entries
-    N_CROSSOVER = 1000
+    N_CROSSOVER = 50
     N_POINT_MUTATION = 5
-    N_INDELS = 20
+    N_INDELS = 50
     MAX_GENERATIONS = 500
     MAX_TMD_LEN = 30
-    MIN_TMD_LEN = 20
+    MIN_TMD_LEN = 18
 
     @classmethod
     def set_mut_params(cls,
@@ -296,11 +296,55 @@ class AAvolutionizer:
         return split_aa_list
 
 
+    def indels_mutation(self, split_aa_seq, indel_tmd=True, indel_jmd=False):
+        indel_proba = (AAvolutionizer.N_INDELS / 100)  # proba per 100 AA
 
-    # PREDICTION
+        # translate parts of allel into bool
+        parts_bool_indel = []
+        for parts in self.set_part_slices:
+            if (parts == "jmd_n") or (parts == "jmd_c"):
+                parts_bool_indel.append(indel_jmd)
+            else:
+                parts_bool_indel.append(indel_tmd)
+
+        for entry in split_aa_seq:
+            for allels, part_bool in zip(entry, parts_bool_indel):
+                indel_proba_allel = proba_decision(indel_proba * len(allels))
+                i = 0
+                if part_bool:
+                    while i < indel_proba_allel:
+                        pos = random.randint(0, len(allels)-1)
+                        ind_allel = entry.index(allels)
+                        if random.random() < 0.5:  # insert
+                            list_aa_letters = AAvolutionizer.slices_propensity_data[ind_allel][0]
+                            norm = AAvolutionizer.slices_propensity_data[ind_allel][1]
+                            get_weighted_aa = np.random.choice(list_aa_letters, 1, p=norm)[0]
+                            allels.insert(pos, get_weighted_aa)
+                        else:  # delete
+                            del allels[pos]
+                        i += 1
+        return split_aa_seq
+
+    # Filtering of TMD lengths
     # __________________________________________________________________________________________________________________
     @staticmethod
-    @timingmethod
+    def tmd_length_filter(df_aa_split):
+        index_list_tmd = []
+        count = 0
+        for col in df_aa_split.columns.tolist():
+            if col == "tmd":
+                index_list_tmd.append(count)
+            count += 1
+        if len(index_list_tmd) == 0:
+            raise ValueError("no tmd in DataFrame")
+        for index, rows in df_aa_split.iterrows():
+            for ind in index_list_tmd:
+                if (len(rows.iloc[ind]) < AAvolutionizer.MIN_TMD_LEN) or (len(rows.iloc[ind]) > AAvolutionizer.MAX_TMD_LEN):
+                    if index in df_aa_split.index.tolist():
+                        df_aa_split = df_aa_split.drop(index, axis=0)
+        return df_aa_split
+
+    @staticmethod
     def aa_tree_pred(non_sub_ccp_feat: pd.DataFrame,
                      non_sub_df: pd.DataFrame,
                      offspring_test_df: pd.DataFrame,
@@ -333,7 +377,8 @@ class AAvolutionizer:
 @timingmethod
 def main_evo():
     import copy
-    pool_gen_0 = AAvolutionizer.gen_zero_maker("prop_SUB").return_parts()
+    initialize = AAvolutionizer.gen_zero_maker("prop_SUB")
+    pool_gen_0 = initialize.return_parts()
     print(pool_gen_0)
     split_pool = seq_splitter(pool_gen_0, ["jmd_n", "tmd", "jmd_c"])
     print(split_pool)
@@ -343,8 +388,15 @@ def main_evo():
     new_mut_list = copy.deepcopy(mut_pool)
     cross_pool = AAvolutionizer.crossover_allel(new_mut_list)
     print(cross_pool)
+    new_cross_pool = copy.deepcopy(cross_pool)
+    indel_pool = initialize.indels_mutation(new_cross_pool)
+    print(indel_pool)
     print(split_pool == mut_pool)
     print(mut_pool == cross_pool)
+    agg_pool = seq_agglomerater(indel_pool, ["jmd_n", "tmd", "jmd_c"])
+    print(agg_pool)
+    tmd_filter = initialize.tmd_length_filter(agg_pool)
+    print(tmd_filter)
 # for debugging
 # ______________________________________________________________________________________________________________________
 if __name__ == "__main__":
