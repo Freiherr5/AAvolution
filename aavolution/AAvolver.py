@@ -5,11 +5,8 @@ import StandardConfig as stdc
 import numpy as np
 import random
 import math
+import copy
 # ML tools import
-from deap import base
-from deap import creator
-from deap import tools
-from deap import algorithms
 import aaanalysis as aa
 # visualize
 import matplotlib.pyplot as plt
@@ -43,19 +40,24 @@ def seq_agglomerater(list_parts, part_tags: list):
     df = pd.DataFrame(list_entries_agglomerated, columns=part_tags)
     return df
 
-def evolution_display(list_pred_dfs):
-    maxFitnessValues = []                         # WIP
-    meanFitnessValues = []
+
+def evolution_display(list_pred_dfs, job_name, mean_benchmark: (int, float) = None, max_benchmark: (int, float) = None):
+
     # for loop to unpack list of dataframes with results
 
     # add threshold lines of substrate performance
     sns.set_style("whitegrid")
-    plt.plot(maxFitnessValues, color='#BF2C34', label="max fitness")
-    plt.plot(meanFitnessValues, color='#43ASBE', label="mean fitness")
-    plt.xlabel('Generation')
-    plt.ylabel('Max / Average Fitness')
-    plt.title('Max and Average Fitness over Generations')
-    plt.legend()
+    ax = list_pred_dfs.plot.line(color=['#ff1212', '#12ffe7'])  # colors for max and mean fitness
+    ax.spines[['right', 'top']].set_visible(False)
+    if isinstance(mean_benchmark, (int, float)):
+        ax.axhline(y=mean_benchmark, color='#0c8f82', linestyle='--')
+    if isinstance(max_benchmark, (int, float)):
+        ax.axhline(y=max_benchmark, color='#950c0c', linestyle='--')
+    ax.xlabel('Generation', fontweight="bold")
+    ax.ylabel('Max / Average Fitness', fontweight="bold")
+    ax.title('Max and Average Fitness over Generations', fontweight="bold", fontsize=15)
+    ax.legend()
+    plt.savefig(f"{job_name}_evolution_progress.png", bbox_inches="tight", dpi=300)
     plt.show()
 
 class AAvolutionizer:
@@ -410,9 +412,76 @@ class AAvolutionizer:
             count += 1
         return surviver_list
 
+
+
+@timingmethod
+def run_aavolution(job_name: str,
+                   parts: list,
+                   mode: str,
+                   df_seq_train: pd.DataFrame,
+                   df_feat_train: pd.DataFrame,
+                   df_bench_pred: pd.DataFrame = None,
+                   propensity_increment_display: int = 10,
+                   dict_parts: dict = {},
+                   dict_evo_params: dict = {}):
+
+    # check inputs
+    # __________________________________________________________________________________________________________________
+
+    # set up model
+    # __________________________________________________________________________________________________________________
+    sf = aa.SequenceFeature()
+    df_parts = sf.get_df_parts(df_seq=df_seq_train)
+    train_x = sf.feature_matrix(features=df_feat_train["feature"], df_parts=df_parts)
+    labels = df_seq_train["label"].to_list()
+
+    tm = aa.TreeModel()
+    tm = tm.fit(train_x, labels=labels)
+
+    if isinstance(df_bench_pred, pd.DataFrame):
+        sf_bench = aa.SequenceFeature()
+        df_parts = sf_bench.get_df_parts(df_seq=df_seq_train)
+        bench_x = sf.feature_matrix(features=df_feat_train["feature"], df_parts=df_parts)
+        pred_bench, pred_std_bench = tm.predict_proba(bench_x)
+    else:
+        pred_bench, pred_std_bench = tm.predict_proba(train_x)
+    mean_bench, max_bench = sum(pred_bench)/len(pred_bench), max(pred_bench)
+
+    # run
+    # __________________________________________________________________________________________________________________
+    initialize = AAvolutionizer.gen_zero_maker(mode, **dict_parts)
+    initialize.set_mut_params(dict_evo_params)
+    pool_df = initialize.return_parts()
+    list_seq_gens = []
+    mut_cycle = 1
+    while mut_cycle <= initialize.MAX_GENERATIONS:
+        child_sf = aa.SequenceFeature()
+        child_df_parts = child_sf.get_df_parts(df_seq=pool_df)
+        child_x = sf.feature_matrix(features=df_feat_train["feature"], df_parts=child_df_parts)
+
+        child_pred, child_pred_std = tm.predict_proba(child_x)
+        pool_df["pred"] = child_pred
+        pool_df["pred_std"] = child_pred_std
+
+        # prediction
+        # split for mutation
+        split_pool = seq_splitter(pool_df, ["jmd_n", "tmd", "jmd_c"])
+        split_pool_for_mut = copy.deepcopy(split_pool)
+        # mutation cycle
+        mut_pool = AAvolutionizer.single_point_mutation(split_pool_for_mut)
+        new_mut_list = copy.deepcopy(mut_pool)
+        cross_pool = AAvolutionizer.crossover_allel(new_mut_list)
+        new_cross_pool = copy.deepcopy(cross_pool)
+        indel_pool = initialize.indels_mutation(new_cross_pool)
+        agg_pool = seq_agglomerater(indel_pool, ["jmd_n", "tmd", "jmd_c"])
+        tmd_filter = initialize.tmd_length_filter(agg_pool)
+        new_gen = initialize.mate_survivors(tmd_filter)
+        mut_cycle += 1
+
+
+
 @timingmethod
 def main_evo():
-    import copy
     initialize = AAvolutionizer.gen_zero_maker("prop_SUB")
     pool_gen_0 = initialize.return_parts()
     print(pool_gen_0)

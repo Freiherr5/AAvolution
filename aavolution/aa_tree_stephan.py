@@ -18,7 +18,7 @@ def main():
     tm = tm.fit(X, labels=labels)
 
     pred, pred_std = tm.predict_proba(X)
-
+    print(pred)
     df_seq["prediction"] = pred
     df_seq["pred_std"] = pred_std
     print(df_seq.columns)
