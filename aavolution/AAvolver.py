@@ -58,6 +58,7 @@ def evolution_display(list_pred_dfs, job_name, mean_benchmark: (int, float) = No
     ax.set_ylabel('Max / Average Fitness', fontweight="bold")
     ax.set_title('Max and Average Fitness over Generations', fontweight="bold", fontsize=15)
     ax.legend()
+    ax.set_xticks(np.linspace(0, list_pred_dfs.shape[0]-1, list_pred_dfs.shape[0]))
     plt.savefig(f"{job_name}_evolution_progress.png", bbox_inches="tight", dpi=300)
     plt.show()
 
@@ -532,9 +533,9 @@ def debug_evo():
 # for debugging
 # ______________________________________________________________________________________________________________________
 if __name__ == "__main__":
-    dict_evo_settings = {"set_population_size": 20,
-                         "max_gen": 5,
-                         "n_point_mut": 50
+    dict_evo_settings = {"set_population_size": 40,
+                         "max_gen": 20,
+                         "n_point_mut": 5
                         }
     path_test = "/home/freiherr/PycharmProjects/AAvolution/_test"
     test_feat = pd.read_excel(f"{path_test}/cpp_feat_sub_nonsub.xlsx")
