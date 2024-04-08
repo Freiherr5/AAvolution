@@ -6,6 +6,7 @@ import numpy as np
 import random
 import math
 import copy
+from datetime import date
 # ML tools import
 import aaanalysis as aa
 # visualize
@@ -41,7 +42,11 @@ def seq_agglomerater(list_parts, part_tags: list):
     return df
 
 
-def evolution_display(list_pred_dfs, job_name, mean_benchmark: (int, float) = None, max_benchmark: (int, float) = None):
+def evolution_display(list_pred_dfs,
+                      job_name,
+                      mean_benchmark: (int, float) = None,
+                      max_benchmark: (int, float) = None,
+                      set_path: str = ""):
 
     # for loop to unpack list of dataframes with results
 
@@ -58,7 +63,7 @@ def evolution_display(list_pred_dfs, job_name, mean_benchmark: (int, float) = No
     ax.set_title('Max and Average Fitness over Generations', fontweight="bold", fontsize=15)
     ax.legend()
     ax.set_xticks(np.linspace(0, list_pred_dfs.shape[0]-1, list_pred_dfs.shape[0]))
-    plt.savefig(f"{job_name}_evolution_progress.png", bbox_inches="tight", dpi=300)
+    plt.savefig(f"{set_path}{job_name}_evolution_progress.png", bbox_inches="tight", dpi=300)
     plt.show()
 
 class AAvolutionizer:
@@ -426,7 +431,9 @@ def run_aavolution(job_name: str,
                    propensity_increment_display: int = 10,  # for AAlogo
                    dict_parts: dict = {},
                    dict_evo_params: dict = {}):
-
+    path_file, path_module, sep = stdc.find_folderpath()
+    folder_path = f"{path_file}{sep}{job_name}_{date.today()}"
+    stdc.make_directory(f"{job_name}_{date.today()}")
     # check inputs
     # __________________________________________________________________________________________________________________
 
@@ -456,6 +463,7 @@ def run_aavolution(job_name: str,
     pool_df = initialize.return_parts()
     list_seq_gens = []
     list_metrics_gens = []
+    gen_counter = 1
     mut_cycle = 1
     while mut_cycle <= initialize.MAX_GENERATIONS:
         child_sf = aa.SequenceFeature()
@@ -471,6 +479,14 @@ def run_aavolution(job_name: str,
         list_metrics_gens.append([max_gen, mean_gen])
         pool_df_decending = pool_df.sort_values("pred", ascending=False)
         list_seq_gens.append(pool_df_decending)
+
+        if gen_counter == propensity_increment_display:
+            stdc.make_directory(f"generations sequences (increment: {propensity_increment_display})", folder_path)
+            pool_df_decending[parts].to_excel(f"{folder_path}{sep}generations sequences (increment: {propensity_increment_display}){sep}seq_gen_{mut_cycle}.xlsx")
+            gen_counter = 1
+        else:
+            gen_counter += 1
+
         # select the top
         pool_df_selected = pool_df_decending[pool_df_decending.index <= np.percentile(pool_df_decending.index,
                                                                                       percent_select*100)]
@@ -498,7 +514,9 @@ def run_aavolution(job_name: str,
     evolution_display(list_pred_dfs=max_mean_gens,
                       job_name=job_name,
                       mean_benchmark=mean_bench,
-                      max_benchmark=max_bench)
+                      max_benchmark=max_bench,
+                      set_path=f"{folder_path}{sep}")
+    top10.to_excel(f"{folder_path}{sep}{job_name}_top10.xlsx")
     return top10
 
 
@@ -533,17 +551,17 @@ def debug_evo():
 # script part
 # ______________________________________________________________________________________________________________________
 if __name__ == "__main__":
-    dict_evo_settings = {"set_population_size": 40,
-                         "max_gen": 20,
-                         "n_point_mut": 5
-                        }
+    job_name = "optimize_y-sec_sub"
+    dict_evo_settings = {"set_population_size": 300,
+                         "max_gen": 500}
+
     path_test = "/home/freiherr/PycharmProjects/AAvolution/_test"
     test_feat = pd.read_excel(f"{path_test}/cpp_feat_sub_nonsub.xlsx")
     sub_df = pd.read_excel(f"{path_test}/TMDrefined_N_out.xlsx", "SUB")
     nonsub_df = pd.read_excel(f"{path_test}/TMDrefined_N_out.xlsx", "NONSUB")
     test_seq = pd.concat([sub_df, nonsub_df], axis=0).reset_index().drop("index", axis=1)
     print(test_seq)
-    top10_test = run_aavolution(job_name="test_run",
+    top10_test = run_aavolution(job_name="job_name",
                                 mode="prop_sub",
                                 parts=["jmd_n", "tmd", "jmd_c"],
                                 df_seq_train=test_seq,
