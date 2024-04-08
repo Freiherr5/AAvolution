@@ -62,7 +62,7 @@ def evolution_display(list_pred_dfs,
     ax.set_ylabel('Max / Average Fitness', fontweight="bold")
     ax.set_title('Max and Average Fitness over Generations', fontweight="bold", fontsize=15)
     ax.legend()
-    ax.set_xticks(np.linspace(0, list_pred_dfs.shape[0]-1, list_pred_dfs.shape[0]))
+    #ax.set_xticks(np.linspace(0, list_pred_dfs.shape[0]-1, list_pred_dfs.shape[0]))
     plt.savefig(f"{set_path}{job_name}_evolution_progress.png", bbox_inches="tight", dpi=300)
     plt.show()
 
@@ -81,9 +81,9 @@ class AAvolutionizer:
     # __________________________________________________________________________________________________________________
     POPULATION_SIZE = 200
     # these all per 100 AA or entries
-    N_CROSSOVER = 50
+    N_CROSSOVER = 5
     N_POINT_MUTATION = 5
-    N_INDELS = 50
+    N_INDELS = 5
     MAX_GENERATIONS = 500
     MAX_TMD_LEN = 30
     MIN_TMD_LEN = 18
@@ -102,7 +102,7 @@ class AAvolutionizer:
             cls.POPULATION_SIZE = set_population_size
         # mutation
         if isinstance(n_crossover_per_seg, (int, float)) and n_crossover_per_seg >= 0:
-            cls.N_CROSSOVER_SEGS = n_crossover_per_seg
+            cls.N_CROSSOVER = n_crossover_per_seg
         if isinstance(n_point_mut, (int, float)) and n_point_mut >= 0:
             cls.N_POINT_MUTATION = n_point_mut
         if isinstance(n_indels, (int, float)) and n_indels >= 0:
@@ -127,7 +127,7 @@ class AAvolutionizer:
                 average mutagenic events for the population 
                 (input values are per 100 individuals)
                 ___________________________________________
-                frequency crossover within each segment: {(cls.N_CROSSOVER * cls.POPULATION_SIZE) / 100} / {cls.POPULATION_SIZE}
+                frequency crossover segment wise: {cls.N_CROSSOVER} / 100 sequences / allel
                 frequency point mutations: {cls.N_POINT_MUTATION} / 100 amino acids
                 frequency indels: {cls.N_INDELS} / 100 amino acids (TMD only)
                 """)
@@ -286,7 +286,7 @@ class AAvolutionizer:
     def crossover_allel(split_aa_list):
         # for crossovers to work, split_aa_list must be changed while being iterrated
         counter = 0   # index current
-        cross_proba = ((AAvolutionizer.N_CROSSOVER * AAvolutionizer.POPULATION_SIZE) / (100 * len(split_aa_list[0])))
+        cross_proba = (AAvolutionizer.N_CROSSOVER / 100)
         for entry in split_aa_list:
             for allels in entry:
                 if random.random() < cross_proba:
@@ -551,9 +551,12 @@ def debug_evo():
 # script part
 # ______________________________________________________________________________________________________________________
 if __name__ == "__main__":
-    job_name = "optimize_y-sec_sub"
-    dict_evo_settings = {"set_population_size": 300,
-                         "max_gen": 500}
+    job_name = "optimize_y-sec_sub 3"
+    dict_evo_settings = {"set_population_size": 500,
+                         "max_gen": 500,
+                         "n_point_mut": 20,
+                         "n_crossover_per_seg": 20,
+                         "n_indels": 20}
 
     path_test = "/home/freiherr/PycharmProjects/AAvolution/_test"
     test_feat = pd.read_excel(f"{path_test}/cpp_feat_sub_nonsub.xlsx")
@@ -561,9 +564,10 @@ if __name__ == "__main__":
     nonsub_df = pd.read_excel(f"{path_test}/TMDrefined_N_out.xlsx", "NONSUB")
     test_seq = pd.concat([sub_df, nonsub_df], axis=0).reset_index().drop("index", axis=1)
     print(test_seq)
-    top10_test = run_aavolution(job_name="job_name",
+    top10_test = run_aavolution(job_name=job_name,
                                 mode="prop_sub",
                                 parts=["jmd_n", "tmd", "jmd_c"],
+                                percent_select=0.1,
                                 df_seq_train=test_seq,
                                 df_feat_train=test_feat,
                                 dict_evo_params=dict_evo_settings)
