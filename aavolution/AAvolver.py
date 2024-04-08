@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
+
 def proba_decision(float_proba):
     decimal, int_proba = math.modf(float_proba)
     if random.random() < decimal:  # decides if this instance chance occurs or not
@@ -53,9 +54,9 @@ def evolution_display(list_pred_dfs, job_name, mean_benchmark: (int, float) = No
         ax.axhline(y=mean_benchmark, color='#0c8f82', linestyle='--')
     if isinstance(max_benchmark, (int, float)):
         ax.axhline(y=max_benchmark, color='#950c0c', linestyle='--')
-    ax.xlabel('Generation', fontweight="bold")
-    ax.ylabel('Max / Average Fitness', fontweight="bold")
-    ax.title('Max and Average Fitness over Generations', fontweight="bold", fontsize=15)
+    ax.set_xlabel('Generation', fontweight="bold")
+    ax.set_ylabel('Max / Average Fitness', fontweight="bold")
+    ax.set_title('Max and Average Fitness over Generations', fontweight="bold", fontsize=15)
     ax.legend()
     plt.savefig(f"{job_name}_evolution_progress.png", bbox_inches="tight", dpi=300)
     plt.show()
@@ -410,8 +411,8 @@ class AAvolutionizer:
                 child.append(allel_gene)
             surviver_list.append(child)
             count += 1
-        return surviver_list
-
+        offspring_df = pd.DataFrame(surviver_list, columns=self.set_part_slices)
+        return offspring_df
 
 
 @timingmethod
@@ -421,7 +422,8 @@ def run_aavolution(job_name: str,
                    df_seq_train: pd.DataFrame,
                    df_feat_train: pd.DataFrame,
                    df_bench_pred: pd.DataFrame = None,
-                   propensity_increment_display: int = 10,
+                   percent_select: float = 0.2,
+                   propensity_increment_display: int = 10,  # for AAlogo
                    dict_parts: dict = {},
                    dict_evo_params: dict = {}):
 
@@ -432,7 +434,7 @@ def run_aavolution(job_name: str,
     # __________________________________________________________________________________________________________________
     sf = aa.SequenceFeature()
     df_parts = sf.get_df_parts(df_seq=df_seq_train)
-    train_x = sf.feature_matrix(features=df_feat_train["feature"], df_parts=df_parts)
+    train_x = sf.feature_matrix(features=df_feat_train["feature"], df_parts=df_parts, accept_gaps=True)
     labels = df_seq_train["label"].to_list()
 
     tm = aa.TreeModel()
@@ -450,22 +452,33 @@ def run_aavolution(job_name: str,
     # run
     # __________________________________________________________________________________________________________________
     initialize = AAvolutionizer.gen_zero_maker(mode, **dict_parts)
-    initialize.set_mut_params(dict_evo_params)
+    initialize.set_mut_params(**dict_evo_params)
     pool_df = initialize.return_parts()
     list_seq_gens = []
+    list_metrics_gens = []
     mut_cycle = 1
     while mut_cycle <= initialize.MAX_GENERATIONS:
         child_sf = aa.SequenceFeature()
-        child_df_parts = child_sf.get_df_parts(df_seq=pool_df)
+        # aaanalysis requires for seq and "entry" column
+        child_df_parts = child_sf.get_df_parts(df_seq=pool_df.reset_index().rename(columns={"index": "entry"}))
         child_x = sf.feature_matrix(features=df_feat_train["feature"], df_parts=child_df_parts)
-
+        # predicting the offspring
         child_pred, child_pred_std = tm.predict_proba(child_x)
         pool_df["pred"] = child_pred
         pool_df["pred_std"] = child_pred_std
-
+        # save data
+        mean_gen, max_gen = sum(child_pred) / len(child_pred), max(child_pred)
+        list_metrics_gens.append([max_gen, mean_gen])
+        pool_df_decending = pool_df.sort_values("pred", ascending=False)
+        list_seq_gens.append(pool_df_decending)
+        # select the top
+        pool_df_selected = pool_df_decending[pool_df_decending.index <= np.percentile(pool_df_decending.index,
+                                                                                      percent_select*100)]
+        # mating
+        new_gen = initialize.mate_survivors(pool_df_selected[parts])
         # prediction
         # split for mutation
-        split_pool = seq_splitter(pool_df, ["jmd_n", "tmd", "jmd_c"])
+        split_pool = seq_splitter(new_gen, parts)
         split_pool_for_mut = copy.deepcopy(split_pool)
         # mutation cycle
         mut_pool = AAvolutionizer.single_point_mutation(split_pool_for_mut)
@@ -473,15 +486,24 @@ def run_aavolution(job_name: str,
         cross_pool = AAvolutionizer.crossover_allel(new_mut_list)
         new_cross_pool = copy.deepcopy(cross_pool)
         indel_pool = initialize.indels_mutation(new_cross_pool)
-        agg_pool = seq_agglomerater(indel_pool, ["jmd_n", "tmd", "jmd_c"])
+        agg_pool = seq_agglomerater(indel_pool, parts)
         tmd_filter = initialize.tmd_length_filter(agg_pool)
-        new_gen = initialize.mate_survivors(tmd_filter)
+        # mating
+        pool_df = initialize.mate_survivors(tmd_filter[parts])
         mut_cycle += 1
 
+    top10 = pd.concat(list_seq_gens, axis=0).sort_values("pred", ascending=False).head(10)
+
+    max_mean_gens = pd.DataFrame(list_metrics_gens, columns=["max", "mean"])
+    evolution_display(list_pred_dfs=max_mean_gens,
+                      job_name=job_name,
+                      mean_benchmark=mean_bench,
+                      max_benchmark=max_bench)
+    return top10
 
 
 @timingmethod
-def main_evo():
+def debug_evo():
     initialize = AAvolutionizer.gen_zero_maker("prop_SUB")
     pool_gen_0 = initialize.return_parts()
     print(pool_gen_0)
@@ -505,7 +527,25 @@ def main_evo():
     new_gen = initialize.mate_survivors(tmd_filter)
     print(len(new_gen))
     print(new_gen)
+
+
 # for debugging
 # ______________________________________________________________________________________________________________________
 if __name__ == "__main__":
-    main_evo()
+    dict_evo_settings = {"set_population_size": 20,
+                         "max_gen": 5,
+                         "n_point_mut": 50
+                        }
+    path_test = "/home/freiherr/PycharmProjects/AAvolution/_test"
+    test_feat = pd.read_excel(f"{path_test}/cpp_feat_sub_nonsub.xlsx")
+    sub_df = pd.read_excel(f"{path_test}/TMDrefined_N_out.xlsx", "SUB")
+    nonsub_df = pd.read_excel(f"{path_test}/TMDrefined_N_out.xlsx", "NONSUB")
+    test_seq = pd.concat([sub_df, nonsub_df], axis=0).reset_index().drop("index", axis=1)
+    print(test_seq)
+    top10_test = run_aavolution(job_name="test_run",
+                                mode="prop_sub",
+                                parts=["jmd_n", "tmd", "jmd_c"],
+                                df_seq_train=test_seq,
+                                df_feat_train=test_feat,
+                                dict_evo_params=dict_evo_settings)
+    print(top10_test)
