@@ -13,7 +13,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-
 def proba_decision(float_proba):
     decimal, int_proba = math.modf(float_proba)
     if random.random() < decimal:  # decides if this instance chance occurs or not
@@ -505,6 +504,7 @@ def run_aavolution(job_name: str,
 
 @timingmethod
 def debug_evo():
+    # for debugging
     initialize = AAvolutionizer.gen_zero_maker("prop_SUB")
     pool_gen_0 = initialize.return_parts()
     print(pool_gen_0)
@@ -530,7 +530,7 @@ def debug_evo():
     print(new_gen)
 
 
-# for debugging
+# script part
 # ______________________________________________________________________________________________________________________
 if __name__ == "__main__":
     dict_evo_settings = {"set_population_size": 40,
