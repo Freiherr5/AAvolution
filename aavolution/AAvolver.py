@@ -458,7 +458,7 @@ def run_aavolution(job_name: str,
 
     # run
     # __________________________________________________________________________________________________________________
-    initialize = AAvolutionizer.gen_zero_maker(mode, **dict_parts)
+    initialize = AAvolutionizer.gen_zero_maker(mode=mode, **dict_parts)
     initialize.set_mut_params(**dict_evo_params)
     pool_df = initialize.return_parts()
     list_seq_gens = []
@@ -508,7 +508,7 @@ def run_aavolution(job_name: str,
         pool_df = initialize.mate_survivors(tmd_filter[parts])
         mut_cycle += 1
 
-    top10 = pd.concat(list_seq_gens, axis=0).sort_values("pred", ascending=False).head(10)
+    top100 = pd.concat(list_seq_gens, axis=0).sort_values("pred", ascending=False).head(100)
 
     max_mean_gens = pd.DataFrame(list_metrics_gens, columns=["max", "mean"])
     evolution_display(list_pred_dfs=max_mean_gens,
@@ -516,8 +516,8 @@ def run_aavolution(job_name: str,
                       mean_benchmark=mean_bench,
                       max_benchmark=max_bench,
                       set_path=f"{folder_path}{sep}")
-    top10.to_excel(f"{folder_path}{sep}{job_name}_top10.xlsx")
-    return top10
+    top100.to_excel(f"{folder_path}{sep}{job_name}_top100.xlsx")
+    return top100
 
 
 @timingmethod
@@ -551,12 +551,12 @@ def debug_evo():
 # script part
 # ______________________________________________________________________________________________________________________
 if __name__ == "__main__":
-    job_name = "optimize_y-sec_sub 3"
+    job_name = "optimize_y-sec_sub 7"
     dict_evo_settings = {"set_population_size": 500,
-                         "max_gen": 500,
-                         "n_point_mut": 20,
-                         "n_crossover_per_seg": 20,
-                         "n_indels": 20}
+                         "max_gen": 300,
+                         "n_point_mut": 4,
+                         "n_crossover_per_seg": 4,
+                         "n_indels": 2}
 
     path_test = "/home/freiherr/PycharmProjects/AAvolution/_test"
     test_feat = pd.read_excel(f"{path_test}/cpp_feat_sub_nonsub.xlsx")
@@ -565,7 +565,7 @@ if __name__ == "__main__":
     test_seq = pd.concat([sub_df, nonsub_df], axis=0).reset_index().drop("index", axis=1)
     print(test_seq)
     top10_test = run_aavolution(job_name=job_name,
-                                mode="prop_sub",
+                                mode="prop_SUB",
                                 parts=["jmd_n", "tmd", "jmd_c"],
                                 percent_select=0.1,
                                 df_seq_train=test_seq,
