@@ -551,7 +551,7 @@ def debug_evo():
 # script part
 # ______________________________________________________________________________________________________________________
 if __name__ == "__main__":
-    job_name = "optimize_y-sec_sub 7"
+    job_name = "optimize_y-sec_sub 8 prop_N_out"
     dict_evo_settings = {"set_population_size": 500,
                          "max_gen": 300,
                          "n_point_mut": 4,
@@ -564,11 +564,11 @@ if __name__ == "__main__":
     nonsub_df = pd.read_excel(f"{path_test}/TMDrefined_N_out.xlsx", "NONSUB")
     test_seq = pd.concat([sub_df, nonsub_df], axis=0).reset_index().drop("index", axis=1)
     print(test_seq)
-    top10_test = run_aavolution(job_name=job_name,
-                                mode="prop_SUB",
-                                parts=["jmd_n", "tmd", "jmd_c"],
-                                percent_select=0.1,
-                                df_seq_train=test_seq,
-                                df_feat_train=test_feat,
-                                dict_evo_params=dict_evo_settings)
-    print(top10_test)
+    top100_test = run_aavolution(job_name=job_name,
+                                 mode="prop_N_out",
+                                 parts=["jmd_n", "tmd", "jmd_c"],
+                                 percent_select=0.1,
+                                 df_seq_train=test_seq,
+                                 df_feat_train=test_feat,
+                                 dict_evo_params=dict_evo_settings)
+    print(top100_test)
