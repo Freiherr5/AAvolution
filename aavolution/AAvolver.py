@@ -11,6 +11,7 @@ from datetime import date
 import aaanalysis as aa
 # visualize
 import matplotlib.pyplot as plt
+import matplotlib.patheffects as pe
 import seaborn as sns
 
 
@@ -46,6 +47,7 @@ def evolution_display(list_pred_dfs,
                       job_name,
                       mean_benchmark: (int, float) = None,
                       max_benchmark: (int, float) = None,
+                      APP_benchmark: (int, float) = None,
                       set_path: str = ""):
 
     # for loop to unpack list of dataframes with results
@@ -55,14 +57,22 @@ def evolution_display(list_pred_dfs,
     ax = list_pred_dfs.plot.line(color=['#ff1212', '#12ffe7'])  # colors for max and mean fitness
     ax.spines[['right', 'top']].set_visible(False)
     if isinstance(mean_benchmark, (int, float)):
-        ax.axhline(y=mean_benchmark, color='#0c8f82', linestyle='--')
+        ax.axhline(y=mean_benchmark, color='#0c8f82', linestyle='--',
+                   path_effects=[pe.withStroke(linewidth=2, foreground="white")])
     if isinstance(max_benchmark, (int, float)):
-        ax.axhline(y=max_benchmark, color='#950c0c', linestyle='--')
+        ax.axhline(y=max_benchmark, color='#950c0c', linestyle='--',
+                   path_effects=[pe.withStroke(linewidth=2, foreground="white")])
+    if isinstance(APP_benchmark, (int, float)):  # APP for comparison
+        ax.text(list_pred_dfs.shape[0], APP_benchmark-0.005, f"APP (pred: {round(APP_benchmark, 3)})", ha="right",
+                va="top", color='#9f19d7',fontweight="heavy", fontsize=11,
+                path_effects=[pe.withStroke(linewidth=2, foreground="white")])
+        ax.axhline(y=APP_benchmark, color='#9f19d7', linestyle='--',
+                   path_effects=[pe.withStroke(linewidth=2, foreground="white")])
     ax.set_xlabel('Generation', fontweight="bold")
     ax.set_ylabel('Max / Average Fitness', fontweight="bold")
     ax.set_title('Max and Average Fitness over Generations', fontweight="bold", fontsize=15)
     ax.legend()
-    #ax.set_xticks(np.linspace(0, list_pred_dfs.shape[0]-1, list_pred_dfs.shape[0]))
+    # ax.set_xticks(np.linspace(0, list_pred_dfs.shape[0]-1, list_pred_dfs.shape[0]))
     plt.savefig(f"{set_path}{job_name}_evolution_progress.png", bbox_inches="tight", dpi=300)
     plt.show()
 
@@ -154,7 +164,7 @@ class AAvolutionizer:
 
 
     @classmethod
-    def gen_zero_maker(cls, mode: str = "rand_prop", **parts_kwargs):
+    def gen_zero_maker(cls, mode: str = "rand_prop", init_population: int = 200, **parts_kwargs):
 
         # check inputs
         # ______________________________________________________________________________________________________________
@@ -189,7 +199,7 @@ class AAvolutionizer:
         # generate the population
         n = 0
         list_seq_all_parts = []
-        while n < cls.POPULATION_SIZE:
+        while n < init_population:
             seq_parts_list = []
             for part_seq, len_part in zip(set_part_slices, set_len_part_slices):
 
@@ -454,11 +464,19 @@ def run_aavolution(job_name: str,
         pred_bench, pred_std_bench = tm.predict_proba(bench_x)
     else:
         pred_bench, pred_std_bench = tm.predict_proba(train_x)
+    APP_pos = df_seq_train.set_index("entry").index.tolist().index("P05067")
+    APP_value = pred_bench[APP_pos]
     mean_bench, max_bench = sum(pred_bench)/len(pred_bench), max(pred_bench)
 
     # run
     # __________________________________________________________________________________________________________________
-    initialize = AAvolutionizer.gen_zero_maker(mode=mode, **dict_parts)
+    population_size = 200
+    if "set_population_size" in dict_evo_params.keys():
+        if isinstance(dict_evo_params["set_population_size"], int):
+            if dict_evo_params["set_population_size"] >= 1:
+                population_size = dict_evo_params["set_population_size"]
+
+    initialize = AAvolutionizer.gen_zero_maker(mode=mode, init_population=population_size, **dict_parts)
     initialize.set_mut_params(**dict_evo_params)
     pool_df = initialize.return_parts()
     list_seq_gens = []
@@ -515,6 +533,7 @@ def run_aavolution(job_name: str,
                       job_name=job_name,
                       mean_benchmark=mean_bench,
                       max_benchmark=max_bench,
+                      APP_benchmark=APP_value,
                       set_path=f"{folder_path}{sep}")
     top100.to_excel(f"{folder_path}{sep}{job_name}_top100.xlsx")
     return top100
@@ -551,9 +570,9 @@ def debug_evo():
 # script part
 # ______________________________________________________________________________________________________________________
 if __name__ == "__main__":
-    job_name = "optimize_y-sec_sub 8 prop_N_out"
+    job_name = "optimize_y-sec_sub 10 prop_N_out"
     dict_evo_settings = {"set_population_size": 500,
-                         "max_gen": 300,
+                         "max_gen": 500,
                          "n_point_mut": 4,
                          "n_crossover_per_seg": 4,
                          "n_indels": 2}
