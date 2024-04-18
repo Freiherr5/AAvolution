@@ -9,6 +9,7 @@ import copy
 from AAvolver import seq_splitter, seq_agglomerater, evolution_display
 from AAvolver import AAvolutionizer as aav
 import aaanalysis as aa
+from ML_AAvolution import StackedClassifiers as sc
 
 
 @timingmethod
@@ -34,16 +35,16 @@ def run_aavolution(job_name: str,
     train_x = sf.feature_matrix(features=df_feat_train["feature"], df_parts=df_parts, accept_gaps=True)
     labels = df_seq_train["label"].to_list()
 
-    tm = aa.TreeModel()
-    tm = tm.fit(train_x, labels=labels)
+    # stacked predicters (ML_AAvolution)
+    clfs_model = sc.clfs_fit(train_x, labels)
 
     if isinstance(df_bench_pred, pd.DataFrame):
         sf_bench = aa.SequenceFeature()
         df_parts = sf_bench.get_df_parts(df_seq=df_seq_train)
         bench_x = sf.feature_matrix(features=df_feat_train["feature"], df_parts=df_parts, accept_gaps=True)
-        pred_bench, pred_std_bench = tm.predict_proba(bench_x)
+        pred_bench = [sublist[1] for sublist in clfs_model.clfs_proba(bench_x)]
     else:
-        pred_bench, pred_std_bench = tm.predict_proba(train_x)
+        pred_bench = [sublist[1] for sublist in clfs_model.clfs_proba(train_x)]
     APP_pos = df_seq_train.set_index("entry").index.tolist().index("P05067")
     APP_value = pred_bench[APP_pos]
     mean_bench, max_bench = sum(pred_bench)/len(pred_bench), max(pred_bench)
@@ -77,9 +78,9 @@ def run_aavolution(job_name: str,
         child_df_parts = child_sf.get_df_parts(df_seq=pool_df.reset_index().rename(columns={"index": "entry"}))
         child_x = sf.feature_matrix(features=df_feat_train["feature"], df_parts=child_df_parts)
         # predicting the offspring
-        child_pred, child_pred_std = tm.predict_proba(child_x)
+        child_pred = [sublist[1] for sublist in clfs_model.clfs_proba(child_x)]
         pool_df["pred"] = child_pred
-        pool_df["pred_std"] = child_pred_std
+
         # save data
         mean_gen, max_gen = sum(child_pred) / len(child_pred), max(child_pred)
         list_mean.append(mean_gen)
@@ -95,7 +96,8 @@ def run_aavolution(job_name: str,
             gen_counter += 1
 
         # select the top
-        pool_df_selected = pool_df_decending[pool_df_decending["pred"] > max(list_mean)]
+        pool_df_selected = pool_df_decending.head(30)
+        #pool_df_selected = pool_df_decending[pool_df_decending["pred"] > mean_gen]
         # mating
         new_gen = initialize.mate_survivors(pool_df_selected[parts])
         # prediction
@@ -131,9 +133,9 @@ def run_aavolution(job_name: str,
 # script part
 # ______________________________________________________________________________________________________________________
 if __name__ == "__main__":
-    job_name = "optimize_y-sec_sub top"
+    job_name = "optimize_y-sec_sub top3"
     dict_evo_settings = {"set_population_size": 500,
-                         "max_gen": 500,
+                         "max_gen": 50,
                          "n_point_mut": 4,
                          "n_crossover_per_seg": 2,
                          "n_indels": 2}
