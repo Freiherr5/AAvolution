@@ -40,11 +40,19 @@ def run_aavolution(job_name: str,
 
     if isinstance(df_bench_pred, pd.DataFrame):
         sf_bench = aa.SequenceFeature()
-        df_parts = sf_bench.get_df_parts(df_seq=df_seq_train)
+        df_parts = sf_bench.get_df_parts(df_seq=df_bench_pred)
         bench_x = sf.feature_matrix(features=df_feat_train["feature"], df_parts=df_parts, accept_gaps=True)
         pred_bench = [sublist[1] for sublist in clfs_model.clfs_proba(bench_x)]
+
+        # save benchmark features
+        bench_feature_df = pd.DataFrame(bench_x)
+        bench_feature_df["entry"] = df_bench_pred["entry"].tolist()
+        bench_feature_df["pred"] = pred_bench
+        bench_feature_df.set_index("entry").to_excel(f"{folder_path}{sep}{job_name}_bench_features_preds.xlsx")
+
     else:
         pred_bench = [sublist[1] for sublist in clfs_model.clfs_proba(train_x)]
+
     APP_pos = df_seq_train.set_index("entry").index.tolist().index("P05067")
     APP_value = pred_bench[APP_pos]
     mean_bench, max_bench = sum(pred_bench)/len(pred_bench), max(pred_bench)
@@ -69,6 +77,7 @@ def run_aavolution(job_name: str,
     list_seq_gens = []
     list_mean = []
     list_metrics_gens = []
+    list_sf_pred = []
     gen_counter = 1
     mut_cycle = 1
     while mut_cycle <= initialize.MAX_GENERATIONS:
@@ -80,6 +89,10 @@ def run_aavolution(job_name: str,
         # predicting the offspring
         child_pred = [sublist[1] for sublist in clfs_model.clfs_proba(child_x)]
         pool_df["pred"] = child_pred
+        # create dataframe list with sequence features
+        child_feature_df = pd.DataFrame(child_x)
+        child_feature_df["pred"] = child_pred
+        list_sf_pred.append(child_feature_df)
 
         # save data
         mean_gen, max_gen = sum(child_pred) / len(child_pred), max(child_pred)
@@ -96,8 +109,8 @@ def run_aavolution(job_name: str,
             gen_counter += 1
 
         # select the top
-        pool_df_selected = pool_df_decending.head(30)
-        #pool_df_selected = pool_df_decending[pool_df_decending["pred"] > mean_gen]
+        # pool_df_selected = pool_df_decending.head(30)
+        pool_df_selected = pool_df_decending[pool_df_decending["pred"] > mean_gen]
         # mating
         new_gen = initialize.mate_survivors(pool_df_selected[parts])
         # prediction
@@ -127,15 +140,18 @@ def run_aavolution(job_name: str,
                       APP_benchmark=APP_value,
                       set_path=f"{folder_path}{sep}")
     top100.to_excel(f"{folder_path}{sep}{job_name}_top100.xlsx")
+    all_child_features = pd.concat(list_sf_pred, axis=0)
+    all_child_features.to_excel(f"{folder_path}{sep}{job_name}_generated_sequences_features_preds.xlsx")
+
     return top100
 
 
 # script part
 # ______________________________________________________________________________________________________________________
 if __name__ == "__main__":
-    job_name = "optimize_y-sec_sub top3"
+    job_name = "optimize_y-sec_sub test_NEW_NEW"
     dict_evo_settings = {"set_population_size": 500,
-                         "max_gen": 50,
+                         "max_gen": 20,
                          "n_point_mut": 4,
                          "n_crossover_per_seg": 2,
                          "n_indels": 2}
@@ -152,5 +168,6 @@ if __name__ == "__main__":
                                  df_seq_train=test_seq,
                                  df_feat_train=test_feat,
                                  df_bench_pred=sub_df,
+                                 propensity_increment_display=1,
                                  dict_evo_params=dict_evo_settings)
     print(top100_test)
