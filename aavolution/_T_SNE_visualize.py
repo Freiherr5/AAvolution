@@ -8,12 +8,15 @@ import seaborn as sns
 def tsne_visualize(df: pd.DataFrame,
                    pred_dict_low_border: dict,
                    pred_color_dict: dict,
+                   df_plus: pd.DataFrame = None,
                    max_instance_per_category: int = 300):
+
+    # initialize T-SNE
     tsne = TSNE(n_components=2, learning_rate=70, n_iter=1000, n_jobs=-1)
     # configuring the parameters
     # the number of components = 2
     # default perplexity = 30
-    # default learning rate = 200
+    # default learning rate = 200S
     # default Maximum number of iterations
     # for the optimization = 1000
 
@@ -49,6 +52,10 @@ def tsne_visualize(df: pd.DataFrame,
                                   .sample(n=max_instance_per_category, replace=False))
     df_transform_pre = pd.concat(list_df_slices, axis=0)
 
+    # for adding a special comparison DataFrame (SUBSTRATES and NONSUBSTRATES)
+    if df_plus is not None:
+        df_transform_pre = pd.concat([df_transform_pre, df_plus], axis=0)
+
     # final dataframes
     # __________________________________________________________________________________________________________________
     df_transform_labels = df_transform_pre["pred"]
@@ -71,6 +78,8 @@ def tsne_visualize(df: pd.DataFrame,
     plt.show()
 
 
+# run T-SNE
+# ______________________________________________________________________________________________________________________
 if __name__ == "__main__":
     data = pd.read_excel("/home/freiherr/PycharmProjects/AAvolution/aavolution/optimize_y-sec_sub test_NEW_NEW_2024-04-19/optimize_y-sec_sub test_NEW_NEW_generated_sequences_features_preds.xlsx").drop("Unnamed: 0", axis=1)
     dict_name = {0.95: "> 95%",
@@ -79,6 +88,7 @@ if __name__ == "__main__":
                  0.20: "> 20%",
                  0.00: ">= 0%"}
 
+    # gradient color scheme + color highlights for lab data
     dict_color = {"> 95%": "#f1f426",
                   "> 80%": "#f0804e",
                   "> 50%": "#c6417d",
@@ -88,5 +98,4 @@ if __name__ == "__main__":
                   "SUBLIT": "#f50c27",
                   "NONSUB": "#0b295c"}
 
-
-    tsne_visualize(data, dict_name, dict_color, 1000)
+    tsne_visualize(data, dict_name, dict_color, None, 1000)
