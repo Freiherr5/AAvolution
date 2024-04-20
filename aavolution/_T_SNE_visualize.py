@@ -5,14 +5,15 @@ from sklearn.manifold import TSNE
 import seaborn as sns
 
 
-def tsne_visualize(df: pd.DataFrame,
+def tsne_visualize(job_name,
+                   df: pd.DataFrame,
                    pred_dict_low_border: dict,
                    pred_color_dict: dict,
                    df_plus: pd.DataFrame = None,
                    max_instance_per_category: int = 300):
 
     # initialize T-SNE
-    tsne = TSNE(n_components=2, learning_rate=70, n_iter=1000, n_jobs=-1)
+    tsne = TSNE(n_components=2, learning_rate=50, n_iter=1500, n_jobs=-1, perplexity=50)
     # configuring the parameters
     # the number of components = 2
     # default perplexity = 30
@@ -75,27 +76,33 @@ def tsne_visualize(df: pd.DataFrame,
     sns.scatterplot(data=tsne_df, x='dimension 1', y='dimension 2',
                     hue='pred', palette=pred_color_dict)
     sns.despine(offset=10, trim=True)
+    plt.legend(loc="upper right")
+    plt.savefig(f"T-SNE_{job_name}", bbox_inches="tight", dpi=300)
     plt.show()
 
 
 # run T-SNE
 # ______________________________________________________________________________________________________________________
 if __name__ == "__main__":
-    data = pd.read_excel("/home/freiherr/PycharmProjects/AAvolution/aavolution/optimize_y-sec_sub test_NEW_NEW_2024-04-19/optimize_y-sec_sub test_NEW_NEW_generated_sequences_features_preds.xlsx").drop("Unnamed: 0", axis=1)
-    dict_name = {0.95: "> 95%",
+    job_name = "Expert_N_out_dist_full_lab_data_v2"
+    data = pd.read_excel("/home/freiherr/PycharmProjects/AAvolution/aavolution/Expert_40gen aavolve result_2/AAvolve_EXPERT_TMD_refined_test_2_generated_sequences_features_preds.xlsx").drop("Unnamed: 0", axis=1)
+    data_lab = pd.read_excel("/home/freiherr/PycharmProjects/AAvolution/aavolution/Expert_40gen aavolve result_2/AAvolve_EXPERT_TMD_refined_test_2_bench_features_preds.xlsx").set_index("entry")
+
+    # borders
+    dict_name = {0.966297971292626: "top 100",
                  0.80: "> 80%",
                  0.50: "> 50%",
                  0.20: "> 20%",
                  0.00: ">= 0%"}
 
     # gradient color scheme + color highlights for lab data
-    dict_color = {"> 95%": "#f1f426",
+    dict_color = {"top 100": "#f1f426",
                   "> 80%": "#f0804e",
                   "> 50%": "#c6417d",
                   "> 20%": "#8707a6",
                   ">= 0%": "#110788",
-                  "SUBEXP": "#f50c65",
-                  "SUBLIT": "#f50c27",
-                  "NONSUB": "#0b295c"}
+                  "SUBEXP": "#23cdd9",
+                  "SUBLIT": "#166fab",
+                  "NONSUB": "#ed2125"}
 
-    tsne_visualize(data, dict_name, dict_color, None, 1000)
+    tsne_visualize(job_name, data, dict_name, dict_color, data_lab, 1000)

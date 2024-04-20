@@ -21,10 +21,12 @@ def run_aavolution(job_name: str,
                    df_bench_pred: pd.DataFrame = None,
                    propensity_increment_display: int = 10,  # for AAlogo
                    dict_parts: dict = {},
-                   dict_evo_params: dict = {}):
+                   dict_evo_params: dict = {},
+                   export_data=False):
     path_file, path_module, sep = stdc.find_folderpath()
     folder_path = f"{path_file}{sep}{job_name}_{date.today()}"
-    stdc.make_directory(f"{job_name}_{date.today()}")
+    if export_data is False:                                  # EXPORT
+        stdc.make_directory(f"{job_name}_{date.today()}")
     # check inputs
     # __________________________________________________________________________________________________________________
 
@@ -48,7 +50,8 @@ def run_aavolution(job_name: str,
         bench_feature_df = pd.DataFrame(bench_x)
         bench_feature_df["entry"] = df_bench_pred["entry"].tolist()
         bench_feature_df["pred"] = pred_bench
-        bench_feature_df.set_index("entry").to_excel(f"{folder_path}{sep}{job_name}_bench_features_preds.xlsx")
+        if export_data is False:                                  # EXPORT
+            bench_feature_df.set_index("entry").to_excel(f"{folder_path}{sep}{job_name}_bench_features_preds.xlsx")
 
     else:
         pred_bench = [sublist[1] for sublist in clfs_model.clfs_proba(train_x)]
@@ -101,12 +104,13 @@ def run_aavolution(job_name: str,
         pool_df_decending = pool_df.sort_values("pred", ascending=False)
         list_seq_gens.append(pool_df_decending)
 
-        if gen_counter == propensity_increment_display:
-            stdc.make_directory(f"generations sequences (increment: {propensity_increment_display})", folder_path)
-            pool_df_decending[parts].to_excel(f"{folder_path}{sep}generations sequences (increment: {propensity_increment_display}){sep}seq_gen_{mut_cycle}.xlsx")
-            gen_counter = 1
-        else:
-            gen_counter += 1
+        if export_data is False:  # EXPORT
+            if gen_counter == propensity_increment_display:
+                stdc.make_directory(f"generations sequences (increment: {propensity_increment_display})", folder_path)
+                pool_df_decending[parts].to_excel(f"{folder_path}{sep}generations sequences (increment: {propensity_increment_display}){sep}seq_gen_{mut_cycle}.xlsx")
+                gen_counter = 1
+            else:
+                gen_counter += 1
 
         # select the top
         # pool_df_selected = pool_df_decending.head(30)
@@ -131,43 +135,49 @@ def run_aavolution(job_name: str,
         mut_cycle += 1
 
     top100 = pd.concat(list_seq_gens, axis=0).sort_values("pred", ascending=False).drop_duplicates().head(100)
-
     max_mean_gens = pd.DataFrame(list_metrics_gens, columns=["max", "mean"])
-    evolution_display(list_pred_dfs=max_mean_gens,
-                      job_name=job_name,
-                      mean_benchmark=mean_bench,
-                      max_benchmark=max_bench,
-                      APP_benchmark=APP_value,
-                      set_path=f"{folder_path}{sep}")
-    top100.to_excel(f"{folder_path}{sep}{job_name}_top100.xlsx")
-    all_child_features = pd.concat(list_sf_pred, axis=0)
-    all_child_features.to_excel(f"{folder_path}{sep}{job_name}_generated_sequences_features_preds.xlsx")
 
-    return top100
+    if export_data:                                  # EXPORT
+        return job_name, max_mean_gens, mean_bench, max_bench, APP_value
+    else:
+        evolution_display(list_pred_dfs=max_mean_gens,
+                          job_name=job_name,
+                          mean_benchmark=mean_bench,
+                          max_benchmark=max_bench,
+                          APP_benchmark=APP_value,
+                          set_path=f"{folder_path}{sep}")
+        top100.to_excel(f"{folder_path}{sep}{job_name}_top100.xlsx")
+        all_child_features = pd.concat(list_sf_pred, axis=0)
+        all_child_features.to_excel(f"{folder_path}{sep}{job_name}_generated_sequences_features_preds.xlsx")
+        return top100
 
 
 # script part
 # ______________________________________________________________________________________________________________________
 if __name__ == "__main__":
-    job_name = "optimize_y-sec_sub test_NEW_NEW"
+    job_name = "AAvolve_EXPERT_TMD_refined_test_2"
     dict_evo_settings = {"set_population_size": 500,
-                         "max_gen": 20,
+                         "max_gen": 40,
                          "n_point_mut": 4,
                          "n_crossover_per_seg": 2,
                          "n_indels": 2}
 
     path_test = "/home/freiherr/PycharmProjects/AAvolution/_test"
-    test_feat = pd.read_excel(f"{path_test}/cpp_feat_sub_nonsub.xlsx")
-    sub_df = pd.read_excel(f"{path_test}/TMDrefined_N_out.xlsx", "SUB")
-    nonsub_df = pd.read_excel(f"{path_test}/TMDrefined_N_out.xlsx", "NONSUB")
-    test_seq = pd.concat([sub_df, nonsub_df], axis=0).reset_index().drop("index", axis=1)
+    path_data = "/home/freiherr/PycharmProjects/AAvolution/aavolution/expert_uniprot_refining"
+    test_feat = pd.read_excel(f"{path_data}/CPP_feat_EXPERT_SUB.xlsx")
+    subexp_df = pd.read_excel(f"{path_data}/expert_TMD_refined.xlsx", "SUBEXP")
+    sublit_df = pd.read_excel(f"{path_data}/expert_TMD_refined.xlsx", "SUBLIT")
+    nonsub_df = pd.read_excel(f"{path_data}/expert_TMD_refined.xlsx", "NONSUB")
+    test_seq = pd.concat([subexp_df, sublit_df, nonsub_df], axis=0).reset_index().drop("index", axis=1)
+    bench_seq = pd.concat([subexp_df, sublit_df], axis=0).reset_index().drop("index", axis=1)
     print(test_seq)
     top100_test = run_aavolution(job_name=job_name,
-                                 mode="prop_N_out",
+                                 mode="rand_prop",
                                  parts=["jmd_n", "tmd", "jmd_c"],
                                  df_seq_train=test_seq,
                                  df_feat_train=test_feat,
-                                 df_bench_pred=sub_df,
+                                 df_bench_pred=test_seq,
                                  propensity_increment_display=1,
-                                 dict_evo_params=dict_evo_settings)
+                                 dict_evo_params=dict_evo_settings,
+                                 export_data=False)
     print(top100_test)
