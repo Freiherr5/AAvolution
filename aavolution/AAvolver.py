@@ -154,7 +154,10 @@ class AAvolutionizer:
                                 "jmd_c": "N_out_JMD_C"},
                  "prop_SUB": {"jmd_n": "SUB_JMD_N",
                               "tmd": "SUB_TMD",
-                              "jmd_c": "SUB_JMD_C"}}
+                              "jmd_c": "SUB_JMD_C"},
+                 "prop_NON_n_SUB": {"jmd_n": "sub_nonsub_JMD_N",
+                                    "tmd": "sub_nonsub_TMD",
+                                    "jmd_c": "sub_nonsub_JMD_C"}}
 
 
     def __init__(self, mode, set_part_slices, df_seq_parts):
@@ -214,6 +217,14 @@ class AAvolutionizer:
                     else:
                         length_aa = len_part
                 elif mode == "prop_SUB":
+                    if len_part < 1:
+                        length_aa_series = cls.length_dist_df[cls.dict_mode[mode][part_seq]].dropna()
+                        pre_p = length_aa_series.to_numpy().tolist()
+                        norm_p = [p / sum(pre_p) for p in pre_p]
+                        length_aa = np.random.choice(length_aa_series.index.tolist(), 1, p=norm_p)
+                    else:
+                        length_aa = len_part
+                elif mode == "prop_NON_n_SUB":
                     if len_part < 1:
                         length_aa_series = cls.length_dist_df[cls.dict_mode[mode][part_seq]].dropna()
                         pre_p = length_aa_series.to_numpy().tolist()

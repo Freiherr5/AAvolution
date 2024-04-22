@@ -13,7 +13,7 @@ def tsne_visualize(job_name,
                    max_instance_per_category: int = 300):
 
     # initialize T-SNE
-    tsne = TSNE(n_components=2, learning_rate=50, n_iter=1500, n_jobs=-1, perplexity=50)
+    tsne = TSNE(n_components=2, learning_rate=30, n_iter=1500, n_jobs=-1, perplexity=40)
     # configuring the parameters
     # the number of components = 2
     # default perplexity = 30
@@ -84,12 +84,13 @@ def tsne_visualize(job_name,
 # run T-SNE
 # ______________________________________________________________________________________________________________________
 if __name__ == "__main__":
-    job_name = "Expert_N_out_dist_full_lab_data_v2"
-    data = pd.read_excel("/home/freiherr/PycharmProjects/AAvolution/aavolution/Expert_40gen aavolve result_2/AAvolve_EXPERT_TMD_refined_test_2_generated_sequences_features_preds.xlsx").drop("Unnamed: 0", axis=1)
-    data_lab = pd.read_excel("/home/freiherr/PycharmProjects/AAvolution/aavolution/Expert_40gen aavolve result_2/AAvolve_EXPERT_TMD_refined_test_2_bench_features_preds.xlsx").set_index("entry")
+    job_name = "W8_nonsub_plus_better_propensity"
+    data = pd.read_excel("/home/freiherr/PycharmProjects/AAvolution/aavolution/W8_TSNE Advanced/W8 RUN NONSUB plus_2024-04-22/W8 RUN NONSUB plus_generated_sequences_features_preds.xlsx").drop("Unnamed: 0", axis=1)
+    data_lab = pd.read_excel("/home/freiherr/PycharmProjects/AAvolution/aavolution/W8_TSNE Advanced/W8 RUN NONSUB plus_2024-04-22/W8 RUN NONSUB plus_bench_features_preds.xlsx").set_index("entry")
 
     # borders
-    dict_name = {0.966297971292626: "top 100",
+    dict_name = {0.965152659344041: "top 100",
+                 0.95: "> 95%",
                  0.80: "> 80%",
                  0.50: "> 50%",
                  0.20: "> 20%",
@@ -97,6 +98,7 @@ if __name__ == "__main__":
 
     # gradient color scheme + color highlights for lab data
     dict_color = {"top 100": "#f1f426",
+                  "> 95%": "#f5b25f",
                   "> 80%": "#f0804e",
                   "> 50%": "#c6417d",
                   "> 20%": "#8707a6",
@@ -105,4 +107,4 @@ if __name__ == "__main__":
                   "SUBLIT": "#166fab",
                   "NONSUB": "#ed2125"}
 
-    tsne_visualize(job_name, data, dict_name, dict_color, data_lab, 1000)
+    tsne_visualize(job_name, data, dict_name, dict_color, data_lab, 200)
