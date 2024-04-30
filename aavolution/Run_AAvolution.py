@@ -60,7 +60,6 @@ def run_aavolution(job_name: str,
         APP_pos = df_bench_pred.set_index("entry").index.tolist().index("P05067")
         APP_value = pred_bench[APP_pos]
     else:
-        APP_pos = None
         APP_value = None
 
     mean_bench, max_bench = sum(pred_bench)/len(pred_bench), max(pred_bench)
@@ -161,19 +160,21 @@ def run_aavolution(job_name: str,
 # script part
 # ______________________________________________________________________________________________________________________
 if __name__ == "__main__":
-    job_name = "W8 RUN NONSUB plus"
-    dict_evo_settings = {"set_population_size": 500,
-                         "max_gen": 200,
-                         "n_point_mut": 4,
+    job_name = "W8 NONSUB generation"
+    dict_evo_settings = {"set_population_size": 200,
+                         "max_gen": 40,
+                         "n_point_mut": 2,
                          "n_crossover_per_seg": 2,
                          "n_indels": 2}
 
     path_test = "/home/freiherr/PycharmProjects/AAvolution/_test"
     path_data = "/home/freiherr/PycharmProjects/AAvolution/aavolution/w8_uniprot_refining"
-    test_feat = pd.read_excel(f"{path_data}/CPP_feat_N8_SUB.xlsx")
-    subexp_df = pd.read_excel(f"{path_data}/w8_TMD_refined.xlsx", "SUBEXP")
-    sublit_df = pd.read_excel(f"{path_data}/w8_TMD_refined.xlsx", "SUBLIT")
-    nonsub_df = pd.read_excel(f"{path_data}/w8_TMD_refined.xlsx", "NONSUB")
+
+    test_feat = pd.read_excel(f"{path_data}/NONSUB_features_w8.xlsx")
+
+    subexp_df = pd.read_excel(f"{path_data}/NONSUB_w8_TMD_refined.xlsx", "SUBEXP")
+    sublit_df = pd.read_excel(f"{path_data}/NONSUB_w8_TMD_refined.xlsx", "SUBLIT")
+    nonsub_df = pd.read_excel(f"{path_data}/NONSUB_w8_TMD_refined.xlsx", "NONSUB")
     test_seq = pd.concat([subexp_df, sublit_df, nonsub_df], axis=0).reset_index().drop("index", axis=1)
     nonsub_test = pd.read_excel("/home/freiherr/PycharmProjects/AAvolution/aavolution/W8_TSNE Advanced/top1000 NONSUB_2024-04-22/top1000 NONSUB_top100.xlsx")
     bench_seq = pd.concat([subexp_df, sublit_df], axis=0).reset_index().drop("index", axis=1)
@@ -184,7 +185,7 @@ if __name__ == "__main__":
                                  parts=["jmd_n", "tmd", "jmd_c"],
                                  df_seq_train=test_seq,
                                  df_feat_train=test_feat,
-                                 df_bench_pred=bench_seq_nonsub_plus,
+                                 df_bench_pred=nonsub_df,
                                  propensity_increment_display=1,
                                  dict_evo_params=dict_evo_settings,
                                  raw_data_only=False)
