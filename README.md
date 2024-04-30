@@ -16,14 +16,14 @@ distribution of the domains.
 
 #### 2) Mutagenesis
 3 main mutation types drive the diversification of the sequence population:
-point-mutations, indels and crossovers
+point-mutations, indels and crossovers.
 
 #### 3) Scoring
 Translation of sequences via CPP [Breimann S., 24c], prediction and scoring via classification
 ensemble (Random Forest, Naive Bayes, Gaussian Process; meta classifier: Logistic Regression).
 
 #### 4) Selection
-Selection after each Scoring-iteration and on other features (allowed length-range of sequence domain)
+Selection after each Scoring-iteration and on other features (allowed length-range of sequence domain).
 
 #### 5) Repopulation
 After each Selection-step, the survivors of the initial population are used to fill up the population to its
